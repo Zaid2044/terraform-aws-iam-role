@@ -14,7 +14,7 @@ module "iam_role" {
   project     = "platform"
   environment = "dev"
 
-  role_name        = "ec2"
+  role_name         = "ec2"
   service_principal = "ec2.amazonaws.com"
 
   managed_policy_arns = [
