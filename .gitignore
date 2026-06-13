@@ -59,7 +59,4 @@ test-results/
 .env
 .env.*
 
-# Local examples state
-examples/**/.terraform/
-examples/**/*.tfstate
-examples/**/*.tfstate.*
+.terraform.lock.hcl

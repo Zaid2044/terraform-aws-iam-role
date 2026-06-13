@@ -1,51 +1,109 @@
-data "aws_iam_policy_document" "assume_role" {
-  statement {
-    effect = "Allow"
+resource "aws_iam_user" "this" {
+  count = var.create_user ? 1 : 0
 
-    actions = [
-      "sts:AssumeRole"
-    ]
+  name          = local.user_name
+  path          = var.path
+  force_destroy = var.force_destroy
 
-    principals {
-      type = "Service"
-
-      identifiers = [
-        var.service_principal
-      ]
+  tags = merge(
+    local.common_tags,
+    {
+      Name = local.user_name
     }
-  }
+  )
 }
 
 resource "aws_iam_role" "this" {
-  name = "${local.name_prefix}-${var.role_name}-role"
+  count = var.create_role ? 1 : 0
 
-  assume_role_policy = data.aws_iam_policy_document.assume_role.json
+  name               = local.role_name
+  path               = var.path
+  assume_role_policy = var.assume_role_policy
 
   tags = merge(
     local.common_tags,
     {
-      Name = "${local.name_prefix}-${var.role_name}-role"
+      Name = local.role_name
     }
   )
 }
 
-resource "aws_iam_role_policy_attachment" "this" {
-  for_each = toset(var.managed_policy_arns)
+resource "aws_iam_policy" "custom" {
+  count = var.create_custom_policy ? 1 : 0
 
-  role       = aws_iam_role.this.name
+  name   = local.custom_policy_name
+  path   = var.path
+  policy = var.custom_policy_json
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = local.custom_policy_name
+    }
+  )
+}
+
+resource "aws_iam_user_policy_attachment" "managed" {
+  for_each = (
+    var.create_user
+    ? toset(var.aws_managed_policy_arns)
+    : []
+  )
+
+  user       = aws_iam_user.this[0].name
   policy_arn = each.value
 }
 
-resource "aws_iam_instance_profile" "this" {
-  name = "${local.name_prefix}-${var.role_name}-profile"
+resource "aws_iam_role_policy_attachment" "managed" {
+  for_each = (
+    var.create_role
+    ? toset(var.aws_managed_policy_arns)
+    : []
+  )
 
-  role = aws_iam_role.this.name
+  role       = aws_iam_role.this[0].name
+  policy_arn = each.value
+}
+
+resource "aws_iam_user_policy_attachment" "custom" {
+  count = (
+    var.create_user &&
+    var.create_custom_policy
+    ? 1
+    : 0
+  )
+
+  user       = aws_iam_user.this[0].name
+  policy_arn = aws_iam_policy.custom[0].arn
+}
+
+resource "aws_iam_role_policy_attachment" "custom" {
+  count = (
+    var.create_role &&
+    var.create_custom_policy
+    ? 1
+    : 0
+  )
+
+  role       = aws_iam_role.this[0].name
+  policy_arn = aws_iam_policy.custom[0].arn
+}
+
+resource "aws_iam_instance_profile" "this" {
+  count = (
+    var.create_instance_profile &&
+    var.create_role
+    ? 1
+    : 0
+  )
+
+  name = local.instance_profile_name
+  role = aws_iam_role.this[0].name
 
   tags = merge(
     local.common_tags,
     {
-      Name = "${local.name_prefix}-${var.role_name}-profile"
+      Name = local.instance_profile_name
     }
   )
 }
-
